@@ -28,12 +28,6 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, LSTM, InputLayer
 import mplfinance as mpf
 
-
-import os
-import pandas as pd
-import yfinance as yf
-from sklearn.preprocessing import MinMaxScaler
-
 def load_and_process_data(start_date, end_date, company="TSLA",
                           feature="Close", split_method="ratio", test_size=0.2,
                           train_start=None, train_end=None, test_start=None, test_end=None,
@@ -188,7 +182,7 @@ model.compile(optimizer='adam', loss='mean_squared_error')
 
 # Now we are going to train this model with our training data 
 # (x_train, y_train)
-model.fit(x_train, y_train, epochs=5, batch_size=32)
+model.fit(x_train, y_train, epochs=25, batch_size=32)
 # Other parameters to consider: How many rounds(epochs) are we going to 
 # train our model? Typically, the more the better, but be careful about
 # overfitting!

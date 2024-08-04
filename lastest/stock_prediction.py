@@ -95,13 +95,6 @@ original_data, original_train_data, original_test_data, train_data, test_data, s
 
 
 def create_candlestick_chart(dataset, company):
-    """
-    Create a candlestick chart with blue and red colors and y-axis label on the left side.
-
-    Parameters:
-    - dataset: DataFrame containing the stock data.
-    - company: Name of the company for the chart title and ylabel.
-    """
     # Define the custom style
     custom_style = mpf.make_mpf_style(
         base_mpf_style='classic',
@@ -109,10 +102,6 @@ def create_candlestick_chart(dataset, company):
             up='blue', down='red', edge='inherit', wick='inherit', volume='in'
         )
     )
-
-    # Set the y-axis label on the left side
-    plt.rcParams['ytick.labelleft'] = True
-    plt.rcParams['ytick.labelright'] = False
 
     # Plot the candlestick chart with the custom style
     mpf.plot(

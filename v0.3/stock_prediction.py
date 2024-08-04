@@ -35,6 +35,59 @@ import yfinance as yf
 from sklearn.preprocessing import MinMaxScaler
 
 
+def load_and_process_data(start_date, end_date, company="TSLA",
+                          feature="Close", split_method="ratio", test_size=0.2,
+                          train_start=None, train_end=None, test_start=None, test_end=None,
+                          save_data=False, load_data=False, na_method='ffill'):
+    # Check if loading from local data is requested
+    if load_data and os.path.exists("stock_data.csv"):
+        data = pd.read_csv("stock_data.csv", index_col=0, parse_dates=True)
+    else:
+        # Load data from source
+        data = yf.download(company, start=start_date, end=end_date, progress=False)
+
+        # Save data if requested
+        if save_data:
+            data.to_csv("stock_data.csv")
+
+    # Print the columns of the loaded data
+    print("Available columns in the data:", data.columns)
+
+    # Keep a copy of the original data for visualization
+    original_data = data.copy()
+
+    # Handle NaN values
+    if na_method == 'ffill':
+        data.fillna(method='ffill', inplace=True)
+    elif na_method == 'bfill':
+        data.fillna(method='bfill', inplace=True)
+    elif na_method == 'drop':
+        data.dropna(inplace=True)
+    elif na_method == 'zero':
+        data.fillna(0, inplace=True)
+
+    # Scale data for the selected feature
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    data[feature] = scaler.fit_transform(data[feature].values.reshape(-1, 1))
+
+    # Print scaled data
+    print(f"Scaled data for {feature}:\n", data[feature].head())
+
+    # Split scaled data into train and test sets
+    if split_method == "ratio":
+        split_index = int(len(data) * (1 - test_size))
+        train_data, test_data = data[:split_index], data[split_index:]
+        original_train_data, original_test_data = original_data[:split_index], original_data[split_index:]
+    elif split_method == "date":
+        train_data = data.loc[train_start:train_end]
+        test_data = data.loc[test_start:test_end]
+        original_train_data = original_data.loc[train_start:train_end]
+        original_test_data = original_data.loc[test_start:test_end]
+
+    # Return original and scaled data, train/test data, and scaler
+    return original_data, original_train_data, original_test_data, train_data, test_data, scaler
+
+
 
 COMPANY = "TSLA"
 TRAIN_START = '2015-01-01'
@@ -50,7 +103,7 @@ features = 'Close'
 # Load and process data
 original_data, original_train_data, original_test_data, train_data, test_data, scaler = load_and_process_data(
     start_date=TRAIN_START, end_date=TEST_END, company=COMPANY,
-    feature=features, split_method="date", test_size=0.2, 
+    feature=features , split_method="date", test_size=0.2, 
     train_start=TRAIN_START, train_end=TRAIN_END, test_start=TEST_START, test_end=TEST_END,
     save_data=True, load_data=False, na_method='ffill'
 )
@@ -137,7 +190,7 @@ model.compile(optimizer='adam', loss='mean_squared_error')
 
 # Now we are going to train this model with our training data 
 # (x_train, y_train)
-model.fit(x_train, y_train, epochs=5, batch_size=32)
+model.fit(x_train, y_train, epochs=25, batch_size=32)
 # Other parameters to consider: How many rounds(epochs) are we going to 
 # train our model? Typically, the more the better, but be careful about
 # overfitting!
@@ -255,47 +308,46 @@ print(f"Prediction: {prediction}")
 # Can you combine these different techniques for a better prediction??
 
 
-mpf.plot(
-            original_test_data,
-            type='candle',
-            title=f"{COMPANY} Share Price",
-            ylabel=f"{COMPANY} Share Price"
+def create_candlestick_chart(dataset, company):
+    # Define the custom style
+    custom_style = mpf.make_mpf_style(
+        base_mpf_style='classic',
+        marketcolors=mpf.make_marketcolors(
+            up='blue', down='red', edge='inherit', wick='inherit', volume='in'
         )
+    )
+    # Plot the candlestick chart with the custom style
+    mpf.plot(
+        dataset,
+        type='candle',
+        style=custom_style,
+        title=f"{company} Stock Price",
+        ylabel=f"{company} Stock Price",
+        ylabel_lower=f"{company} Volume"
+    )
+create_candlestick_chart(original_test_data,COMPANY)
 
+def plot_boxplots(ticker, start_date, end_date, save_chart=False, chart_path='chart/multiple_boxplots_chart.png'):
+    # Fetch the stock data
+    df = yf.download(ticker, start=start_date, end=end_date)
 
+    # Ensure the index is a datetime index
+    df.index = pd.to_datetime(df.index)
 
-def create_boxplot_from_candlestick_data(dataset, days):
-    """
-    Create a boxplot from candlestick data for a specified number of days.
-
-    Parameters:
-    dataset (pd.DataFrame): The dataset containing the candlestick data.
-    days (int): The number of days to include in the boxplot.
-
-    Returns:
-    None
-    """
-    # Ensure the number of days does not exceed the length of the dataset
-    if days > len(dataset):
-        days = len(dataset)
+    # Create a boxplot for the 'Open', 'High', 'Low', 'Close', and 'Adj Close' prices
+    plt.figure(figsize=(12, 8))
+    df_to_plot = df[['Open', 'High', 'Low', 'Close', 'Adj Close']]
+    boxplot = df_to_plot.boxplot(patch_artist=True)
     
-    # Prepare data for boxplot
-    boxplot_data = []
-    for i in range(days):
-        row = dataset.iloc[i]
-        day_prices = [row['Open'], row['High'], row['Low'], row['Close']]
-        boxplot_data.append(day_prices)
-
-    # Create the boxplot
-    plt.figure(figsize=(10, 6))
-    plt.boxplot(boxplot_data, vert=True, patch_artist=True)
-    plt.title(f"{COMPANY} Share Price")
-    plt.xlabel('Date')
-    plt.ylabel('Price')
-    plt.xticks(ticks=range(1, days + 1), labels=dataset.index[:days].strftime('%Y-%m-%d'), rotation=45)
-    plt.tight_layout()
+    # Set the color of the boxes
+    for box in boxplot.artists:
+        box.set_facecolor('blue')
+    
+    plt.title(f'{ticker} Boxplot Chart ({start_date} to {end_date})')
+    plt.ylabel('Price ($)')
+    plt.xticks([1, 2, 3, 4, 5], ['Open Price', 'High Price', 'Low Price', 'Close Price', 'Adj Close'])
+ 
+    # Show the plot
     plt.show()
 
-
-df = pd.DataFrame(original_test_data)
-create_boxplot_from_candlestick_data(df, 10)
+plot_boxplots(ticker="AAPL", start_date="2020-01-01", end_date="2020-12-31")   
