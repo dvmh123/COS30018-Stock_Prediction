@@ -34,68 +34,7 @@ import pandas as pd
 import yfinance as yf
 from sklearn.preprocessing import MinMaxScaler
 
-def load_and_process_data(start_date, end_date, data_source="yahoo", company="TSLA", 
-                          features=["Close"], test_size=0.2, random_split=True, 
-                          save_data=False, load_data=False, na_method='drop'):
-    # Check if loading from local data is requested
-    if load_data and os.path.exists("stock_data.csv"):
-        data = pd.read_csv("stock_data.csv", index_col=0, parse_dates=True)
-    else:
-        # Load data from source
-        data = yf.download(company, start=start_date, end=end_date, progress=False)
 
-        # Save data if requested
-        if save_data:
-            data.to_csv("stock_data.csv")
-
-    # Print the columns of the loaded data
-    print("Available columns in the data:", data.columns)
-
-    # Keep a copy of the original data for visualization
-    original_data = data.copy()
-
-    # Handle NaN values
-    if na_method == 'ffill':
-        data.fillna(method='ffill', inplace=True)
-    elif na_method == 'bfill':
-        data.fillna(method='bfill', inplace=True)
-    elif na_method == 'drop':
-        data.dropna(inplace=True)
-    elif na_method == 'zero':
-        data.fillna(0, inplace=True)
-
-    # Split original data into train and test sets
-    if not random_split:
-        split_index = int(len(original_data) * (1 - test_size))
-        original_train_data, original_test_data = original_data[:split_index], original_data[split_index:]
-    else:
-        train_end_idx = int(len(original_data) * (1 - test_size))
-        original_train_data = original_data.iloc[:train_end_idx]
-        test_start_idx = train_end_idx - len(original_data)
-        original_test_data = original_data.iloc[test_start_idx:]
-
-    # Print original data
-    print("Original data:\n", original_data[features].head())
-
-    # Scale data
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    data[features] = scaler.fit_transform(data[features])
-
-    # Print scaled data
-    print("Scaled data:\n", data[features].head())
-
-    # Split scaled data into train and test sets
-    if not random_split:
-        split_index = int(len(data) * (1 - test_size))
-        train_data, test_data = data[:split_index], data[split_index:]
-    else:
-        train_end_idx = int(len(data) * (1 - test_size))
-        train_data = data.iloc[:train_end_idx]
-        test_start_idx = train_end_idx - len(data)
-        test_data = data.iloc[test_start_idx:]
-
-    # Return original and scaled data, train/test data, and scaler
-    return original_data, original_train_data, original_test_data, train_data, test_data, scaler
 
 COMPANY = "TSLA"
 TRAIN_START = '2015-01-01'
@@ -106,11 +45,14 @@ PREDICTION_DAYS = 10
 PRICE_VALUE = ["Open", "High", "Low", "Close", "Adj Close","Volume"]
 
 # Change features here
-features = PRICE_VALUE
+features = 'Close'
 
+# Load and process data
 original_data, original_train_data, original_test_data, train_data, test_data, scaler = load_and_process_data(
-    start_date=TRAIN_START, end_date=TEST_END, company=COMPANY, 
-    features=features, save_data=True, load_data=False, random_split=False, na_method='ffill'
+    start_date=TRAIN_START, end_date=TEST_END, company=COMPANY,
+    feature=features, split_method="date", test_size=0.2, 
+    train_start=TRAIN_START, train_end=TRAIN_END, test_start=TEST_START, test_end=TEST_END,
+    save_data=True, load_data=False, na_method='ffill'
 )
 
 
